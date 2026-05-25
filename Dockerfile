@@ -1,24 +1,18 @@
 
-FROM php:8.2-apache
+FROM php:8.2-cli-alpine
 
 
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf
-
-
-RUN a2enmod rewrite
-
-
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
+    autoconf \
+    build-base \
     libpng-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
     zip \
     unzip \
     git \
-    libssl-dev \
-    pkg-config
+    openssl-dev \
+    pkgconfig
 
 
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
@@ -26,6 +20,7 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
 
 
 RUN pecl install mongodb && docker-php-ext-enable mongodb
+
 
 WORKDIR /var/www/html
 COPY . .
@@ -36,8 +31,13 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 RUN composer install --no-dev --optimize-autoloader
 
 
-RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+RUN chown -R root:root /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chmod -R 777 /var/www/html/storage /var/www/html/bootstrap/cache
 
 
-EXPOSE 80
+RUN php artisan config:cache \
+    && php artisan route:cache \
+    && php artisan view:cache
+
+
+CMD php artisan serve --host=0.0.0.0 --port=$PORT
